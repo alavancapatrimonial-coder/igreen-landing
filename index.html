@@ -1290,16 +1290,15 @@
 <script>
   // URL do Google Apps Script
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxD1t7Hxsx84qqkSXK6zkMHMlfWndLNB3y8w9iDs2fcnQl2cMqMEIe1ALICSDbNLHAS/exec';
-  const _URL_CONFIGURADA = (APPS_SCRIPT_URL.indexOf('script.google.com/macros') !== -1 && APPS_SCRIPT_URL.slice(-5) === '/exec');
+  const _URL_OK = (APPS_SCRIPT_URL.length > 50 && APPS_SCRIPT_URL.includes('/exec'));
 
   // ---- helpers de step ----
   function goNext(step){
-    const cur = document.getElementById('fs' + step);
-    const fields = [...cur.querySelectorAll('input[required], select[required]')];
-    for(const f of fields){
-      if(!f.value.trim()){ f.focus(); f.reportValidity(); return; }
+    var cur = document.getElementById('fs' + step);
+    var fields = Array.from(cur.querySelectorAll('input[required], select[required]'));
+    for(var i = 0; i < fields.length; i++){
+      if(!fields[i].value.trim()){ fields[i].focus(); fields[i].reportValidity(); return; }
     }
-    // Ao avançar para step 4, preenche o resumo
     if(step === 3){ preencheResumo(); }
     cur.classList.remove('on');
     document.getElementById('fs' + (step + 1)).classList.add('on');
@@ -1312,100 +1311,107 @@
     if(step - 1 === 1) document.getElementById('sticky').classList.remove('show');
   }
 
-  // ---- feedback de upload ----
+  // ---- feedback de upload (chamada pelo HTML via onchange) ----
   function fileOk(inp, okId){
-    const el = document.getElementById(okId);
+    var el = document.getElementById(okId);
     if(el && inp.files && inp.files[0]){
-      el.textContent = '✓ ' + inp.files[0].name;
+      el.textContent = '\u2713 ' + inp.files[0].name;
       el.style.display = 'block';
     }
   }
 
   // ---- FAQ ----
   function faq(btn){
-    const item = btn.closest('.faq-item') || btn.parentElement;
+    var item = btn.closest ? btn.closest('.faq-item') : btn.parentElement;
+    if(!item) item = btn.parentElement;
     item.classList.toggle('open');
-    btn.textContent = btn.textContent.replace(
-      item.classList.contains('open') ? '▾' : '▴',
-      item.classList.contains('open') ? '▴' : '▾'
-    );
+    var isOpen = item.classList.contains('open');
+    btn.textContent = btn.textContent.replace(isOpen ? '\u25be' : '\u25b4', isOpen ? '\u25b4' : '\u25be');
   }
 
   // ---- sticky CTA ----
-  window.addEventListener('scroll', () => {
-    const h = document.querySelector('.hero');
+  window.addEventListener('scroll', function(){
+    var h = document.querySelector('.hero');
     if(!h) return;
-    const show = window.scrollY > h.offsetHeight;
-    document.getElementById('sticky')?.classList.toggle('show', show);
+    var sticky = document.getElementById('sticky');
+    if(sticky) sticky.classList.toggle('show', window.scrollY > h.offsetHeight);
   });
 
   // ---- preenche resumo no step 4 ----
   function preencheResumo(){
-    const set = (id, val) => {
-      const el = document.getElementById(id);
-      if(el) el.textContent = val || '—';
-    };
-    set('c-nome', document.getElementById('f-nome')?.value);
-    set('c-cpf',  document.getElementById('f-cpf')?.value);
-    set('c-tel',  document.getElementById('f-tel')?.value);
-    set('c-uc',   document.getElementById('f-uc')?.value);
-    set('c-city', document.getElementById('f-city')?.value);
+    function set(id, val){
+      var el = document.getElementById(id);
+      if(el) el.textContent = val || '\u2014';
+    }
+    set('c-nome', document.getElementById('f-nome') ? document.getElementById('f-nome').value : '');
+    set('c-cpf',  document.getElementById('f-cpf')  ? document.getElementById('f-cpf').value  : '');
+    set('c-tel',  document.getElementById('f-tel')  ? document.getElementById('f-tel').value  : '');
+    set('c-uc',   document.getElementById('f-uc')   ? document.getElementById('f-uc').value   : '');
+    set('c-city', document.getElementById('f-city') ? document.getElementById('f-city').value : '');
   }
 
-  // ---- envio com Google Sheets + Drive ----
+  // ---- envio para Google Sheets + Drive ----
   async function enviar(){
     if(!document.getElementById('termos').checked){
       alert('Aceite os termos de uso para continuar.'); return;
     }
-    if(!_URL_CONFIGURADA){
-      alert('Configure a URL do Apps Script no código antes de usar!'); return;
+    if(!_URL_OK){
+      alert('Configure a URL do Apps Script no codigo antes de usar!'); return;
     }
 
-    const btn = document.querySelector('#fs4 button[onclick="enviar()"]');
-    if(btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
+    var btn = document.querySelector('button[onclick="enviar()"]');
+    if(btn){ btn.disabled = true; btn.textContent = 'Enviando...'; }
 
     try {
-      // Lê arquivos como base64
-      const toBase64 = file => new Promise((res, rej) => {
-        if(!file){ res(null); return; }
-        const r = new FileReader();
-        r.onload = () => res(r.result.split(',')[1]);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
+      function toBase64(file){
+        return new Promise(function(res, rej){
+          if(!file){ res(null); return; }
+          var r = new FileReader();
+          r.onload = function(){ res(r.result.split(',')[1]); };
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+      }
 
-      const contaFile = document.getElementById('u-conta')?.files[0] || null;
-      const docFile   = document.getElementById('u-doc')?.files[0]   || null;
-      const [contaB64, docB64] = await Promise.all([toBase64(contaFile), toBase64(docFile)]);
+      var contaInp = document.getElementById('u-conta');
+      var docInp   = document.getElementById('u-doc');
+      var contaFile = (contaInp && contaInp.files[0]) ? contaInp.files[0] : null;
+      var docFile   = (docInp   && docInp.files[0])   ? docInp.files[0]   : null;
 
-      const concEl = document.getElementById('f-conc');
-      const tensEl = document.getElementById('f-tens');
+      var contaB64 = await toBase64(contaFile);
+      var docB64   = await toBase64(docFile);
 
-      const payload = {
-        nome:          document.getElementById('f-nome')?.value  || '',
-        cpf:           document.getElementById('f-cpf')?.value   || '',
-        nascimento:    document.getElementById('f-nasc')?.value  || '',
-        telefone:      document.getElementById('f-tel')?.value   || '',
-        email:         document.getElementById('f-email')?.value || '',
-        uc:            document.getElementById('f-uc')?.value    || '',
-        concessionaria: concEl?.options[concEl?.selectedIndex]?.text || '',
-        valorConta:    document.getElementById('f-val')?.value   || '',
-        cidade:        document.getElementById('f-city')?.value  || '',
-        tensao:        tensEl?.options[tensEl?.selectedIndex]?.text  || '',
-        contaArquivo:  contaB64 || null,
-        contaNome:     contaFile?.name || null,
-        contaTipo:     contaFile?.type || null,
-        docArquivo:    docB64   || null,
-        docNome:       docFile?.name  || null,
-        docTipo:       docFile?.type  || null,
-        dataHora:      new Date().toLocaleString('pt-BR')
+      var concEl = document.getElementById('f-conc');
+      var tensEl = document.getElementById('f-tens');
+
+      var payload = {
+        nome:           document.getElementById('f-nome')  ? document.getElementById('f-nome').value  : '',
+        cpf:            document.getElementById('f-cpf')   ? document.getElementById('f-cpf').value   : '',
+        nascimento:     document.getElementById('f-nasc')  ? document.getElementById('f-nasc').value  : '',
+        telefone:       document.getElementById('f-tel')   ? document.getElementById('f-tel').value   : '',
+        email:          document.getElementById('f-email') ? document.getElementById('f-email').value : '',
+        uc:             document.getElementById('f-uc')    ? document.getElementById('f-uc').value    : '',
+        concessionaria: concEl ? concEl.options[concEl.selectedIndex].text : '',
+        valorConta:     document.getElementById('f-val')   ? document.getElementById('f-val').value   : '',
+        cidade:         document.getElementById('f-city')  ? document.getElementById('f-city').value  : '',
+        tensao:         tensEl ? tensEl.options[tensEl.selectedIndex].text : '',
+        contaArquivo:   contaB64  || null,
+        contaNome:      contaFile ? contaFile.name : null,
+        contaTipo:      contaFile ? contaFile.type : null,
+        docArquivo:     docB64    || null,
+        docNome:        docFile   ? docFile.name   : null,
+        docTipo:        docFile   ? docFile.type   : null,
+        dataHora:       new Date().toLocaleString('pt-BR')
       };
 
-      const resp = await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify(payload)
+      // Usar text/plain para evitar CORS preflight
+      var resp = await fetch(APPS_SCRIPT_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify(payload)
       });
-      const result = await resp.json();
+
+      var result = await resp.json();
 
       if(result.status === 'ok'){
         document.getElementById('fs4').classList.remove('on');
@@ -1417,7 +1423,7 @@
     } catch(err){
       console.error('Erro no envio:', err);
       alert('Erro ao enviar: ' + err.message + '. Tente novamente.');
-      if(btn){ btn.disabled = false; btn.textContent = '🚀 Enviar cadastro'; }
+      if(btn){ btn.disabled = false; btn.textContent = '\uD83D\DE80 Enviar cadastro'; }
     }
   }
 </script>
