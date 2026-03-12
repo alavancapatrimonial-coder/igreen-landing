@@ -1288,153 +1288,136 @@
 </div>
 
 <script>
-  // =============================================
-  // CONFIGURAÇÃO — cole aqui a URL do Apps Script
-  // =============================================
+  // URL do Google Apps Script
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxD1t7Hxsx84qqkSXK6zkMHMlfWndLNB3y8w9iDs2fcnQl2cMqMEIe1ALICSDbNLHAS/exec';
+  const _URL_CONFIGURADA = (APPS_SCRIPT_URL.indexOf('script.google.com/macros') !== -1 && APPS_SCRIPT_URL.slice(-5) === '/exec');
 
   // ---- helpers de step ----
   function goNext(step){
-    const cur=document.getElementById('fs'+step);
-    const fields=[...cur.querySelectorAll('input[required],select[required]')];
+    const cur = document.getElementById('fs' + step);
+    const fields = [...cur.querySelectorAll('input[required], select[required]')];
     for(const f of fields){
-      if(!f.value.trim()){f.focus();f.reportValidity();return;}
+      if(!f.value.trim()){ f.focus(); f.reportValidity(); return; }
     }
+    // Ao avançar para step 4, preenche o resumo
+    if(step === 3){ preencheResumo(); }
     cur.classList.remove('on');
-    document.getElementById('fs'+(step+1)).classList.add('on');
+    document.getElementById('fs' + (step + 1)).classList.add('on');
     document.getElementById('sticky').classList.add('show');
   }
+
   function goBack(step){
-    document.getElementById('fs'+step).classList.remove('on');
-    document.getElementById('fs'+(step-1)).classList.add('on');
-    if(step-1===1) document.getElementById('sticky').classList.remove('show');
+    document.getElementById('fs' + step).classList.remove('on');
+    document.getElementById('fs' + (step - 1)).classList.add('on');
+    if(step - 1 === 1) document.getElementById('sticky').classList.remove('show');
   }
 
-  // ---- upload drag & drop ----
-  function initUpload(inputId,zoneId,labelId){
-    const inp=document.getElementById(inputId);
-    const zone=document.getElementById(zoneId);
-    const lbl=document.getElementById(labelId);
-    if(!inp||!zone) return;
-    zone.addEventListener('click',()=>inp.click());
-    zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
-    zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
-    zone.addEventListener('drop',e=>{
-      e.preventDefault();zone.classList.remove('drag');
-      if(e.dataTransfer.files[0]) inp.files=e.dataTransfer.files,handleFile(inp,lbl);
-    });
-    inp.addEventListener('change',()=>handleFile(inp,lbl));
-  }
-  function handleFile(inp,lbl){
-    if(inp.files[0]){
-      if(lbl) lbl.textContent='✓ '+inp.files[0].name;
+  // ---- feedback de upload ----
+  function fileOk(inp, okId){
+    const el = document.getElementById(okId);
+    if(el && inp.files && inp.files[0]){
+      el.textContent = '✓ ' + inp.files[0].name;
+      el.style.display = 'block';
     }
   }
-  document.addEventListener('DOMContentLoaded',()=>{
-    initUpload('u-conta','zone-conta','lbl-conta');
-    initUpload('u-doc','zone-doc','lbl-doc');
-  });
 
   // ---- FAQ ----
   function faq(btn){
-    const item=btn.closest('.faq-item')||btn.parentElement;
+    const item = btn.closest('.faq-item') || btn.parentElement;
     item.classList.toggle('open');
-    btn.textContent=btn.textContent.replace(item.classList.contains('open')?'▾':'▴',item.classList.contains('open')?'▴':'▾');
+    btn.textContent = btn.textContent.replace(
+      item.classList.contains('open') ? '▾' : '▴',
+      item.classList.contains('open') ? '▴' : '▾'
+    );
   }
 
   // ---- sticky CTA ----
-  window.addEventListener('scroll',()=>{
-    const h=document.querySelector('.hero');
+  window.addEventListener('scroll', () => {
+    const h = document.querySelector('.hero');
     if(!h) return;
-    const show=window.scrollY>h.offsetHeight;
-    document.getElementById('sticky')?.classList.toggle('show',show);
+    const show = window.scrollY > h.offsetHeight;
+    document.getElementById('sticky')?.classList.toggle('show', show);
   });
 
-  // ---- resumo no step 4 ----
+  // ---- preenche resumo no step 4 ----
   function preencheResumo(){
-    const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val||'—';};
-    set('r-nome',  document.getElementById('f-nome')?.value);
-    set('r-cpf',   document.getElementById('f-cpf')?.value);
-    set('r-nasc',  document.getElementById('f-nasc')?.value);
-    set('r-tel',   document.getElementById('f-tel')?.value);
-    set('r-email', document.getElementById('f-email')?.value);
-    set('r-uc',    document.getElementById('f-uc')?.value);
-    set('r-conc',  document.getElementById('f-conc')?.options[document.getElementById('f-conc')?.selectedIndex]?.text);
-    set('r-val',   document.getElementById('f-val')?.value ? 'R$ '+document.getElementById('f-val').value+',00' : '');
-    set('r-city',  document.getElementById('f-city')?.value);
-    set('r-tens',  document.getElementById('f-tens')?.options[document.getElementById('f-tens')?.selectedIndex]?.text);
-    const conta=document.getElementById('u-conta')?.files[0];
-    const doc=document.getElementById('u-doc')?.files[0];
-    set('r-conta', conta?.name);
-    set('r-doc',   doc?.name);
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if(el) el.textContent = val || '—';
+    };
+    set('c-nome', document.getElementById('f-nome')?.value);
+    set('c-cpf',  document.getElementById('f-cpf')?.value);
+    set('c-tel',  document.getElementById('f-tel')?.value);
+    set('c-uc',   document.getElementById('f-uc')?.value);
+    set('c-city', document.getElementById('f-city')?.value);
   }
-
-  // Atualiza resumo ao entrar no step 4
-  const _origGoNext = goNext;
 
   // ---- envio com Google Sheets + Drive ----
   async function enviar(){
     if(!document.getElementById('termos').checked){
-      alert('Aceite os termos de uso para continuar.');return;
+      alert('Aceite os termos de uso para continuar.'); return;
     }
-    if(APPS_SCRIPT_URL==='https://script.google.com/macros/s/AKfycbxD1t7Hxsx84qqkSXK6zkMHMlfWndLNB3y8w9iDs2fcnQl2cMqMEIe1ALICSDbNLHAS/exec'){
-      alert('Configure a URL do Apps Script no código antes de usar!');return;
+    if(!_URL_CONFIGURADA){
+      alert('Configure a URL do Apps Script no código antes de usar!'); return;
     }
 
-    const btn=document.querySelector('#fs4 button[type=submit]:not([onclick*="Back"])');
-    if(btn){btn.disabled=true;btn.textContent='Enviando…';}
+    const btn = document.querySelector('#fs4 button[onclick="enviar()"]');
+    if(btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
 
-    try{
+    try {
       // Lê arquivos como base64
-      const toBase64=file=>new Promise((res,rej)=>{
-        if(!file){res(null);return;}
-        const r=new FileReader();
-        r.onload=()=>res(r.result.split(',')[1]);
-        r.onerror=rej;
+      const toBase64 = file => new Promise((res, rej) => {
+        if(!file){ res(null); return; }
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(',')[1]);
+        r.onerror = rej;
         r.readAsDataURL(file);
       });
 
-      const contaFile=document.getElementById('u-conta')?.files[0]||null;
-      const docFile=document.getElementById('u-doc')?.files[0]||null;
-      const [contaB64,docB64]=await Promise.all([toBase64(contaFile),toBase64(docFile)]);
+      const contaFile = document.getElementById('u-conta')?.files[0] || null;
+      const docFile   = document.getElementById('u-doc')?.files[0]   || null;
+      const [contaB64, docB64] = await Promise.all([toBase64(contaFile), toBase64(docFile)]);
 
-      const payload={
-        nome:    document.getElementById('f-nome')?.value||'',
-        cpf:     document.getElementById('f-cpf')?.value||'',
-        nascimento: document.getElementById('f-nasc')?.value||'',
-        telefone:document.getElementById('f-tel')?.value||'',
-        email:   document.getElementById('f-email')?.value||'',
-        uc:      document.getElementById('f-uc')?.value||'',
-        concessionaria: document.getElementById('f-conc')?.options[document.getElementById('f-conc')?.selectedIndex]?.text||'',
-        valorConta: document.getElementById('f-val')?.value||'',
-        cidade:  document.getElementById('f-city')?.value||'',
-        tensao:  document.getElementById('f-tens')?.options[document.getElementById('f-tens')?.selectedIndex]?.text||'',
-        contaArquivo:    contaB64||null,
-        contaNome:       contaFile?.name||null,
-        contaTipo:       contaFile?.type||null,
-        docArquivo:      docB64||null,
-        docNome:         docFile?.name||null,
-        docTipo:         docFile?.type||null,
-        dataHora:        new Date().toLocaleString('pt-BR')
+      const concEl = document.getElementById('f-conc');
+      const tensEl = document.getElementById('f-tens');
+
+      const payload = {
+        nome:          document.getElementById('f-nome')?.value  || '',
+        cpf:           document.getElementById('f-cpf')?.value   || '',
+        nascimento:    document.getElementById('f-nasc')?.value  || '',
+        telefone:      document.getElementById('f-tel')?.value   || '',
+        email:         document.getElementById('f-email')?.value || '',
+        uc:            document.getElementById('f-uc')?.value    || '',
+        concessionaria: concEl?.options[concEl?.selectedIndex]?.text || '',
+        valorConta:    document.getElementById('f-val')?.value   || '',
+        cidade:        document.getElementById('f-city')?.value  || '',
+        tensao:        tensEl?.options[tensEl?.selectedIndex]?.text  || '',
+        contaArquivo:  contaB64 || null,
+        contaNome:     contaFile?.name || null,
+        contaTipo:     contaFile?.type || null,
+        docArquivo:    docB64   || null,
+        docNome:       docFile?.name  || null,
+        docTipo:       docFile?.type  || null,
+        dataHora:      new Date().toLocaleString('pt-BR')
       };
 
-      const resp=await fetch(APPS_SCRIPT_URL,{
-        method:'POST',
-        body:JSON.stringify(payload)
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
       });
-      const result=await resp.json();
+      const result = await resp.json();
 
-      if(result.status==='ok'){
+      if(result.status === 'ok'){
         document.getElementById('fs4').classList.remove('on');
         document.getElementById('fsok').classList.add('on');
         document.getElementById('sticky').classList.remove('show');
       } else {
-        throw new Error(result.message||'Erro desconhecido');
+        throw new Error(result.message || 'Erro desconhecido');
       }
     } catch(err){
-      console.error('Erro no envio:',err);
-      alert('Erro ao enviar: '+err.message+'. Tente novamente ou entre em contato.');
-      if(btn){btn.disabled=false;btn.textContent='🚀 Enviar cadastro';}
+      console.error('Erro no envio:', err);
+      alert('Erro ao enviar: ' + err.message + '. Tente novamente.');
+      if(btn){ btn.disabled = false; btn.textContent = '🚀 Enviar cadastro'; }
     }
   }
 </script>
