@@ -1288,65 +1288,155 @@
 </div>
 
 <script>
-/* CALC */
-function calcular(){
-  const v=parseFloat(document.getElementById('c-in').value);
-  const r=document.getElementById('c-res');
-  if(!v||v<150){r.classList.remove('show');return}
-  const m=(v*.3).toFixed(2),a=(v*.3*12).toFixed(2);
-  document.getElementById('eco-mes').textContent='R$ '+m.replace('.',',');
-  document.getElementById('eco-ano').textContent='R$ '+a.replace('.',',');
-  r.classList.add('show');
-}
-/* FORM */
-let cs=1;
-function goNext(f){
-  document.getElementById('fs'+f).classList.remove('on');
-  cs=f+1;if(cs===4)fillConfirm();
-  document.getElementById('fs'+cs).classList.add('on');
-  updateProg();
-  document.getElementById('cadastro').scrollIntoView({behavior:'smooth',block:'start'});
-}
-function goBack(f){
-  document.getElementById('fs'+f).classList.remove('on');
-  cs=f-1;document.getElementById('fs'+cs).classList.add('on');updateProg();
-}
-function updateProg(){
-  for(let i=1;i<=4;i++) document.getElementById('pb'+i).classList.toggle('on',i<=cs);
-  document.getElementById('plbl').textContent=cs;
-}
-function fillConfirm(){
-  document.getElementById('c-nome').textContent=document.getElementById('f-nome').value||'—';
-  document.getElementById('c-cpf').textContent=document.getElementById('f-cpf').value||'—';
-  document.getElementById('c-tel').textContent=document.getElementById('f-tel').value||'—';
-  document.getElementById('c-uc').textContent='UC: '+(document.getElementById('f-uc').value||'—');
-  document.getElementById('c-city').textContent=(document.getElementById('f-city').value||'—')+', MG';
-}
-function enviar(){
-  if(!document.getElementById('termos').checked){alert('Aceite os termos de uso para continuar.');return}
-  document.getElementById('fs4').classList.remove('on');
-  document.getElementById('fsok').classList.add('on');
-  document.getElementById('sticky').classList.remove('show');
-}
-function fileOk(inp,id){
-  if(inp.files&&inp.files[0]) document.getElementById(id).style.display='block';
-}
-/* CPF mask */
-document.getElementById('f-cpf').addEventListener('input',function(){
-  let v=this.value.replace(/\D/g,'').slice(0,11);
-  v=v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');
-  this.value=v;
-});
-/* FAQ */
-function faq(btn){
-  const a=btn.nextElementSibling,open=btn.classList.contains('open');
-  document.querySelectorAll('.faq-q.open').forEach(b=>{b.classList.remove('open');b.nextElementSibling.classList.remove('open')});
-  if(!open){btn.classList.add('open');a.classList.add('open')}
-}
-/* STICKY */
-window.addEventListener('scroll',()=>{
-  document.getElementById('sticky').classList.toggle('show',scrollY>600);
-});
+  // =============================================
+  // CONFIGURAÇÃO — cole aqui a URL do Apps Script
+  // =============================================
+  const APPS_SCRIPT_URL = 'COLE_AQUI_A_URL_DO_APPS_SCRIPT';
+
+  // ---- helpers de step ----
+  function goNext(step){
+    const cur=document.getElementById('fs'+step);
+    const fields=[...cur.querySelectorAll('input[required],select[required]')];
+    for(const f of fields){
+      if(!f.value.trim()){f.focus();f.reportValidity();return;}
+    }
+    cur.classList.remove('on');
+    document.getElementById('fs'+(step+1)).classList.add('on');
+    document.getElementById('sticky').classList.add('show');
+  }
+  function goBack(step){
+    document.getElementById('fs'+step).classList.remove('on');
+    document.getElementById('fs'+(step-1)).classList.add('on');
+    if(step-1===1) document.getElementById('sticky').classList.remove('show');
+  }
+
+  // ---- upload drag & drop ----
+  function initUpload(inputId,zoneId,labelId){
+    const inp=document.getElementById(inputId);
+    const zone=document.getElementById(zoneId);
+    const lbl=document.getElementById(labelId);
+    if(!inp||!zone) return;
+    zone.addEventListener('click',()=>inp.click());
+    zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
+    zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+    zone.addEventListener('drop',e=>{
+      e.preventDefault();zone.classList.remove('drag');
+      if(e.dataTransfer.files[0]) inp.files=e.dataTransfer.files,handleFile(inp,lbl);
+    });
+    inp.addEventListener('change',()=>handleFile(inp,lbl));
+  }
+  function handleFile(inp,lbl){
+    if(inp.files[0]){
+      if(lbl) lbl.textContent='✓ '+inp.files[0].name;
+    }
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    initUpload('u-conta','zone-conta','lbl-conta');
+    initUpload('u-doc','zone-doc','lbl-doc');
+  });
+
+  // ---- FAQ ----
+  function faq(btn){
+    const item=btn.closest('.faq-item')||btn.parentElement;
+    item.classList.toggle('open');
+    btn.textContent=btn.textContent.replace(item.classList.contains('open')?'▾':'▴',item.classList.contains('open')?'▴':'▾');
+  }
+
+  // ---- sticky CTA ----
+  window.addEventListener('scroll',()=>{
+    const h=document.querySelector('.hero');
+    if(!h) return;
+    const show=window.scrollY>h.offsetHeight;
+    document.getElementById('sticky')?.classList.toggle('show',show);
+  });
+
+  // ---- resumo no step 4 ----
+  function preencheResumo(){
+    const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val||'—';};
+    set('r-nome',  document.getElementById('f-nome')?.value);
+    set('r-cpf',   document.getElementById('f-cpf')?.value);
+    set('r-nasc',  document.getElementById('f-nasc')?.value);
+    set('r-tel',   document.getElementById('f-tel')?.value);
+    set('r-email', document.getElementById('f-email')?.value);
+    set('r-uc',    document.getElementById('f-uc')?.value);
+    set('r-conc',  document.getElementById('f-conc')?.options[document.getElementById('f-conc')?.selectedIndex]?.text);
+    set('r-val',   document.getElementById('f-val')?.value ? 'R$ '+document.getElementById('f-val').value+',00' : '');
+    set('r-city',  document.getElementById('f-city')?.value);
+    set('r-tens',  document.getElementById('f-tens')?.options[document.getElementById('f-tens')?.selectedIndex]?.text);
+    const conta=document.getElementById('u-conta')?.files[0];
+    const doc=document.getElementById('u-doc')?.files[0];
+    set('r-conta', conta?.name);
+    set('r-doc',   doc?.name);
+  }
+
+  // Atualiza resumo ao entrar no step 4
+  const _origGoNext = goNext;
+
+  // ---- envio com Google Sheets + Drive ----
+  async function enviar(){
+    if(!document.getElementById('termos').checked){
+      alert('Aceite os termos de uso para continuar.');return;
+    }
+    if(APPS_SCRIPT_URL==='COLE_AQUI_A_URL_DO_APPS_SCRIPT'){
+      alert('Configure a URL do Apps Script no código antes de usar!');return;
+    }
+
+    const btn=document.querySelector('#fs4 button[type=submit]:not([onclick*="Back"])');
+    if(btn){btn.disabled=true;btn.textContent='Enviando…';}
+
+    try{
+      // Lê arquivos como base64
+      const toBase64=file=>new Promise((res,rej)=>{
+        if(!file){res(null);return;}
+        const r=new FileReader();
+        r.onload=()=>res(r.result.split(',')[1]);
+        r.onerror=rej;
+        r.readAsDataURL(file);
+      });
+
+      const contaFile=document.getElementById('u-conta')?.files[0]||null;
+      const docFile=document.getElementById('u-doc')?.files[0]||null;
+      const [contaB64,docB64]=await Promise.all([toBase64(contaFile),toBase64(docFile)]);
+
+      const payload={
+        nome:    document.getElementById('f-nome')?.value||'',
+        cpf:     document.getElementById('f-cpf')?.value||'',
+        nascimento: document.getElementById('f-nasc')?.value||'',
+        telefone:document.getElementById('f-tel')?.value||'',
+        email:   document.getElementById('f-email')?.value||'',
+        uc:      document.getElementById('f-uc')?.value||'',
+        concessionaria: document.getElementById('f-conc')?.options[document.getElementById('f-conc')?.selectedIndex]?.text||'',
+        valorConta: document.getElementById('f-val')?.value||'',
+        cidade:  document.getElementById('f-city')?.value||'',
+        tensao:  document.getElementById('f-tens')?.options[document.getElementById('f-tens')?.selectedIndex]?.text||'',
+        contaArquivo:    contaB64||null,
+        contaNome:       contaFile?.name||null,
+        contaTipo:       contaFile?.type||null,
+        docArquivo:      docB64||null,
+        docNome:         docFile?.name||null,
+        docTipo:         docFile?.type||null,
+        dataHora:        new Date().toLocaleString('pt-BR')
+      };
+
+      const resp=await fetch(APPS_SCRIPT_URL,{
+        method:'POST',
+        body:JSON.stringify(payload)
+      });
+      const result=await resp.json();
+
+      if(result.status==='ok'){
+        document.getElementById('fs4').classList.remove('on');
+        document.getElementById('fsok').classList.add('on');
+        document.getElementById('sticky').classList.remove('show');
+      } else {
+        throw new Error(result.message||'Erro desconhecido');
+      }
+    } catch(err){
+      console.error('Erro no envio:',err);
+      alert('Erro ao enviar: '+err.message+'. Tente novamente ou entre em contato.');
+      if(btn){btn.disabled=false;btn.textContent='🚀 Enviar cadastro';}
+    }
+  }
 </script>
 </body>
 </html>
